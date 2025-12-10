@@ -8,14 +8,17 @@ pub fn add(left: u64, right: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use crate::fixed_vec::FixedVec;
-    use super::*;
 
     #[test]
-    fn it_works() {
-        let vec = FixedVec::<u64>::new(3);
-        vec.push(1);
-        vec.push(2);
-        vec.push(3);
-        vec.push(4);
+    fn single_thread() {
+        let vec = FixedVec::<u64>::new(2);
+        assert_eq!(Ok(()), vec.push(1));
+        assert_eq!(Ok(()), vec.push(2));
+        // No more space, the value should be returned.
+        assert_eq!(Err(4), vec.push(4));
+        // This should be in bounds.
+        assert_eq!(Some(&2u64), vec.get(1));
+        // This should be out of bounds.
+        assert_eq!(None, vec.get(2));
     }
 }

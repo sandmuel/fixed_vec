@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 /// A thread safe [`Vec`]-like structure that never implicitly reallocates.
 ///
-/// Because it uses atomics and does not reallocate, [`FixedVec::push`] does not require a mutable reference to self.
+/// Because it uses atomics and does not reallocate, [`FixedVec::push`] does not require locks or a mutable reference to self.
 pub struct FixedVec<T> {
     pointer: NonNull<T>,
     cap: usize,
@@ -47,6 +47,16 @@ impl<T> FixedVec<T> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        // Acquire to ensure writes up to this length have actually completed.
+        self.len.load(Acquire)
+    }
+
+    pub fn acquire(&self) {
+        // Acquire to ensure writes up to this length have actually completed.
+        black_box(self.len.load(Acquire));
+    }
+
     pub fn push(&self, value: T) -> Result<(), T> {
         let len = self.len.fetch_update(Release, Relaxed, |len| {
             if len < self.cap {
@@ -65,17 +75,21 @@ impl<T> FixedVec<T> {
         }
     }
 
-    pub fn len(&self) -> usize {
-        // Acquire to ensure writes up to this length have actually completed.
-        self.len.load(Acquire)
+    pub fn get(&self, index: usize) -> Option<&T> {
+        if index < self.len() {
+            // SAFETY: index is within the length, so this is allocated and initialized memory.
+            let ptr = unsafe { self.pointer.as_ptr().add(index) };
+            // SAFETY: ptr was derived from a `NonNull`, so this shouldn't be null. It is aligned to `T`.
+            return Some(unsafe { ptr.as_ref().expect("pointer should be non-null") });
+        }
+        None
     }
 }
 
 impl<T> Drop for FixedVec<T> {
     fn drop(&mut self) {
         unsafe {
-            // Load len to ensure all writes are complete before deallocating.
-            black_box(self.len.load(Acquire));
+            self.acquire();
             dealloc(self.pointer.as_ptr() as *mut u8, Layout::array::<T>(self.cap).unwrap());
         }
     }
