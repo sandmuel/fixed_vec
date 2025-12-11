@@ -66,13 +66,24 @@ impl<T> FixedVec<T> {
     }
 
     pub fn push(&self, value: T) -> Result<(), T> {
-        // Using `Relaxed` since we don't care what goes on at previous indices when pushing.
+        // Using `Relaxed` since we don't care what goes on at previous indices when
+        // pushing.
         let idx = self.next_idx.fetch_add(1, Relaxed);
 
         if idx < self.cap {
-            let ptr = unsafe { self.ptr.add(idx) };
-            unsafe { ptr.write(value) };
-            self.len.store(idx + 1, Release);
+            unsafe {
+                let ptr = self.ptr.add(idx);
+                ptr.write(value);
+            }
+            loop {
+                match self
+                    .len
+                    .compare_exchange_weak(idx, idx + 1, Release, Relaxed)
+                {
+                    Ok(_) => break,
+                    Err(_) => continue,
+                }
+            }
             Ok(())
         } else {
             Err(value)
