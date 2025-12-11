@@ -1,6 +1,6 @@
 use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
 use std::hint::black_box;
-use std::ptr::{drop_in_place, slice_from_raw_parts_mut, NonNull};
+use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
@@ -10,6 +10,7 @@ use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 /// require locks or a mutable reference to self.
 pub struct FixedVec<T> {
     ptr: NonNull<T>,
+    next_idx: AtomicUsize,
     len: AtomicUsize,
     cap: usize,
 }
@@ -44,6 +45,7 @@ impl<T> FixedVec<T> {
 
         Self {
             ptr,
+            next_idx: AtomicUsize::new(0),
             len: AtomicUsize::new(0),
             cap: capacity,
         }
@@ -64,20 +66,16 @@ impl<T> FixedVec<T> {
     }
 
     pub fn push(&self, value: T) -> Result<(), T> {
-        let len = self.len.fetch_update(Release, Relaxed, |len| {
-            if len < self.cap {
-                return Some(len + 1);
-            }
-            None
-        });
+        // Using `Relaxed` since we don't care what goes on at previous indices when pushing.
+        let idx = self.next_idx.fetch_add(1, Relaxed);
 
-        match len {
-            Ok(len) => {
-                let ptr = unsafe { self.ptr.add(len) };
-                unsafe { ptr.write(value) };
-                Ok(())
-            }
-            Err(_) => Err(value),
+        if idx < self.cap {
+            let ptr = unsafe { self.ptr.add(idx) };
+            unsafe { ptr.write(value) };
+            self.len.store(idx + 1, Release);
+            Ok(())
+        } else {
+            Err(value)
         }
     }
 
