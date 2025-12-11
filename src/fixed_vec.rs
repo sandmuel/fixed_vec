@@ -1,4 +1,4 @@
-use std::alloc::{Layout, alloc, handle_alloc_error, dealloc};
+use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
 use std::hint::black_box;
 use std::ptr::NonNull;
 use std::sync::atomic::AtomicUsize;
@@ -6,7 +6,8 @@ use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 /// A thread safe [`Vec`]-like structure that never implicitly reallocates.
 ///
-/// Because it uses atomics and does not reallocate, [`FixedVec::push`] does not require locks or a mutable reference to self.
+/// Because it uses atomics and does not reallocate, [`FixedVec::push`] does not
+/// require locks or a mutable reference to self.
 pub struct FixedVec<T> {
     pointer: NonNull<T>,
     cap: usize,
@@ -15,7 +16,8 @@ pub struct FixedVec<T> {
 
 // SAFETY: operations on the same value are atomic.
 unsafe impl<T: Send> Send for FixedVec<T> {}
-// SAFETY: addresses are all based on the atomic length and unmodified pointer. They cannot overlap.
+// SAFETY: addresses are all based on the atomic length and unmodified pointer.
+// They cannot overlap.
 unsafe impl<T: Sync> Sync for FixedVec<T> {}
 
 impl<T> FixedVec<T> {
@@ -77,10 +79,24 @@ impl<T> FixedVec<T> {
 
     pub fn get(&self, index: usize) -> Option<&T> {
         if index < self.len() {
-            // SAFETY: index is within the length, so this is allocated and initialized memory.
+            // SAFETY: index is within the length, so this is allocated and initialized
+            // memory.
             let ptr = unsafe { self.pointer.as_ptr().add(index) };
-            // SAFETY: ptr was derived from a `NonNull`, so this shouldn't be null. It is aligned to `T`.
+            // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
+            // aligned to `T`.
             return Some(unsafe { ptr.as_ref().expect("pointer should be non-null") });
+        }
+        None
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        if index < self.len() {
+            // SAFETY: index is within the length, so this is allocated and initialized
+            // memory.
+            let ptr = unsafe { self.pointer.as_ptr().add(index) };
+            // SAFETY: ptr was derived from a `NonNull`, so this can't be null, and, because
+            // we use a mutable reference to self, it is exclusive. It is aligned to `T`.
+            return Some(unsafe { ptr.as_mut().expect("pointer should be non-null") });
         }
         None
     }
@@ -90,7 +106,10 @@ impl<T> Drop for FixedVec<T> {
     fn drop(&mut self) {
         unsafe {
             self.acquire();
-            dealloc(self.pointer.as_ptr() as *mut u8, Layout::array::<T>(self.cap).unwrap());
+            dealloc(
+                self.pointer.as_ptr() as *mut u8,
+                Layout::array::<T>(self.cap).unwrap(),
+            );
         }
     }
 }
