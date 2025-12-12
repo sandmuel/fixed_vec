@@ -1,10 +1,6 @@
 mod fixed_vec;
 pub use fixed_vec::FixedVec;
 
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
 #[cfg(test)]
 mod tests {
     use crate::fixed_vec::FixedVec;
