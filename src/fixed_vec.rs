@@ -51,7 +51,7 @@ impl<T> FixedVec<T> {
         }
     }
 
-    pub fn realloc(&mut self) -> Self {
+    pub fn realloc(self) -> Self {
         let len = self.len();
         // Double the capacity when reallocating.
         let new_vec = Self::new(len * 2);
