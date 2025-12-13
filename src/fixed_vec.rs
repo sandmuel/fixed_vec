@@ -51,6 +51,18 @@ impl<T> FixedVec<T> {
         }
     }
 
+    pub fn realloc(&mut self) -> Self {
+        let len = self.len();
+        // Double the capacity when reallocating.
+        let new_vec = Self::new(len * 2);
+        // SAFETY: we just created the destination, nothing else has a reference to it.
+        unsafe { new_vec.ptr.copy_from_nonoverlapping(self.ptr, len); }
+        new_vec.next_idx.store(len, Relaxed);
+        // Release so the copied data is accessible.
+        new_vec.len.store(len, Release);
+        new_vec
+    }
+
     pub fn len(&self) -> usize {
         // Acquire to ensure writes up to this length have actually completed.
         self.len.load(Acquire)
@@ -93,11 +105,11 @@ impl<T> FixedVec<T> {
     pub fn get(&self, index: usize) -> Option<&T> {
         if index < self.len() {
             // SAFETY: index is within the length, so this is allocated and initialized
-            // memory.
-            let ptr = unsafe { self.ptr.as_ptr().add(index) };
+            // memory. Allocations exceeding isize::MAX panic, so this can't overflow.
+            let ptr = unsafe { self.ptr.add(index) };
             // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
             // aligned to `T`.
-            return Some(unsafe { ptr.as_ref().expect("pointer should be non-null") });
+            return Some(unsafe { ptr.as_ref() });
         }
         None
     }
@@ -106,10 +118,10 @@ impl<T> FixedVec<T> {
         if index < self.len() {
             // SAFETY: index is within the length, so this is allocated and initialized
             // memory.
-            let ptr = unsafe { self.ptr.as_ptr().add(index) };
+            let mut ptr = unsafe { self.ptr.add(index) };
             // SAFETY: ptr was derived from a `NonNull`, so this can't be null, and, because
             // we use a mutable reference to self, it is exclusive. It is aligned to `T`.
-            return Some(unsafe { ptr.as_mut().expect("pointer should be non-null") });
+            return Some(unsafe { ptr.as_mut() });
         }
         None
     }
