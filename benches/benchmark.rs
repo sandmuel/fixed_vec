@@ -55,18 +55,26 @@ fn criterion_benchmark(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("BoxCar get", |b| {
-        b.iter_batched(
-            || {
-                let vec = boxcar::Vec::new();
-                for _ in 0..1 {
-                    _ = vec.push(1);
-                }
-                vec
-            },
-            |vec| _ = black_box(vec.get(black_box(0))),
-            BatchSize::SmallInput,
-        );
+    let mut vec = Vec::new();
+    for _ in 0..10_000 {
+        vec.push(1);
+    }
+
+    c.bench_function("Vec independent get", |b| {
+        b.iter(|| {
+            black_box(vec.get(black_box(0)));
+        });
+    });
+
+    let vec = FixedVec::new(10_000);
+    for _ in 0..10_000 {
+        _ = vec.push(1);
+    }
+
+    c.bench_function("FixedVec independent get", |b| {
+        b.iter(|| {
+            black_box(vec.get(black_box(0)));
+        });
     });
 }
 

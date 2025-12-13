@@ -105,7 +105,7 @@ impl<T: Send + Sync> FixedVec<T> {
     ///
     /// Contrary to [`Vec::remove`], elements are not shifted. Removed elements
     /// will be replaced first when calling [`Self::push`].
-    pub fn remove(&self, index: usize) {
+    pub fn remove(&mut self, index: usize) {
         if index < self.len() {
             // SAFETY: index is within the length, so this is allocated and initialized
             // memory. Allocations exceeding isize::MAX panic, so this can't overflow.
@@ -113,7 +113,6 @@ impl<T: Send + Sync> FixedVec<T> {
             // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
             // aligned to `T`.
             let elem = unsafe { ptr.as_mut() };
-            // TODO: make this safe. Make it atomic.
             *elem = None;
         }
     }
