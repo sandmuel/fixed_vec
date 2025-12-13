@@ -9,7 +9,7 @@ use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 /// Because it uses atomics and does not reallocate, [`FixedVec::push`] does not
 /// require locks or a mutable reference to self.
 pub struct FixedVec<T: Send + Sync> {
-    ptr: NonNull<Option<T>>,
+    ptr: NonNull<T>,
     next_idx: AtomicUsize,
     len: AtomicUsize,
     cap: usize,
@@ -27,10 +27,10 @@ impl<T: Send + Sync> FixedVec<T> {
         if capacity == 0 {
             ptr = NonNull::dangling();
         } else {
-            let layout = Layout::array::<Option<T>>(capacity).expect("Layout overflow");
+            let layout = Layout::array::<T>(capacity).expect("Layout overflow");
 
             // SAFETY: we check for a zero-sized type or capacity above.
-            let raw_ptr = unsafe { alloc(layout) } as *mut Option<T>;
+            let raw_ptr = unsafe { alloc(layout) } as *mut T;
 
             if raw_ptr.is_null() {
                 handle_alloc_error(layout);
@@ -76,7 +76,7 @@ impl<T: Send + Sync> FixedVec<T> {
         black_box(self.len.load(Acquire));
     }
 
-    pub fn push(&self, value: T) -> Result<usize, T> {
+    pub fn push(&self, value: T) -> Result<(), T> {
         // Using `Relaxed` since we don't care what goes on at previous indices when
         // pushing.
         let idx = self.next_idx.fetch_add(1, Relaxed);
@@ -84,7 +84,7 @@ impl<T: Send + Sync> FixedVec<T> {
         if idx < self.cap {
             unsafe {
                 let ptr = self.ptr.add(idx);
-                ptr.write(Some(value));
+                ptr.write(value);
             }
             loop {
                 match self
@@ -95,25 +95,9 @@ impl<T: Send + Sync> FixedVec<T> {
                     Err(_) => continue,
                 }
             }
-            Ok(idx)
+            Ok(())
         } else {
             Err(value)
-        }
-    }
-
-    /// Removes an element from this vector at the given index.
-    ///
-    /// Contrary to [`Vec::remove`], elements are not shifted. Removed elements
-    /// will be replaced first when calling [`Self::push`].
-    pub fn remove(&mut self, index: usize) {
-        if index < self.len() {
-            // SAFETY: index is within the length, so this is allocated and initialized
-            // memory. Allocations exceeding isize::MAX panic, so this can't overflow.
-            let mut ptr = unsafe { self.ptr.add(index) };
-            // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
-            // aligned to `T`.
-            let elem = unsafe { ptr.as_mut() };
-            *elem = None;
         }
     }
 
@@ -125,7 +109,7 @@ impl<T: Send + Sync> FixedVec<T> {
             // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
             // aligned to `T`.
             let elem = unsafe { ptr.as_ref() };
-            return elem.as_ref();
+            return Some(elem);
         }
         None
     }
@@ -138,7 +122,7 @@ impl<T: Send + Sync> FixedVec<T> {
             // SAFETY: ptr was derived from a `NonNull`, so this can't be null, and, because
             // we use a mutable reference to self, it is exclusive. It is aligned to `T`.
             let elem = unsafe { ptr.as_mut() };
-            return elem.as_mut();
+            return Some(elem);
         }
         None
     }
@@ -147,7 +131,7 @@ impl<T: Send + Sync> FixedVec<T> {
 impl<T: Send + Sync> Drop for FixedVec<T> {
     fn drop(&mut self) {
         let elems = slice_from_raw_parts_mut(self.ptr.as_ptr(), self.len());
-        let layout = Layout::array::<Option<T>>(self.cap).unwrap();
+        let layout = Layout::array::<T>(self.cap).unwrap();
         unsafe {
             drop_in_place(elems);
             // Can't deallocate if it's zero-sized.
