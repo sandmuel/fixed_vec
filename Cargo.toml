@@ -9,3 +9,5 @@ criterion = "0.8"
 [[bench]]
 name = "benchmark"
 harness = false
+[dependencies]
+boxcar = "0.2.14"

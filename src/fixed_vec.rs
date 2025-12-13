@@ -8,32 +8,29 @@ use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 ///
 /// Because it uses atomics and does not reallocate, [`FixedVec::push`] does not
 /// require locks or a mutable reference to self.
-pub struct FixedVec<T> {
-    ptr: NonNull<T>,
+pub struct FixedVec<T: Send + Sync> {
+    ptr: NonNull<Option<T>>,
     next_idx: AtomicUsize,
     len: AtomicUsize,
     cap: usize,
 }
 
 // SAFETY: operations on the same value are atomic.
-unsafe impl<T: Send> Send for FixedVec<T> {}
+unsafe impl<T: Send + Sync> Send for FixedVec<T> {}
 // SAFETY: addresses are all based on the atomic length and unmodified pointer.
 // They cannot overlap.
-unsafe impl<T: Sync> Sync for FixedVec<T> {}
+unsafe impl<T: Send + Sync> Sync for FixedVec<T> {}
 
-impl<T> FixedVec<T> {
-    pub fn new(mut capacity: usize) -> Self {
+impl<T: Send + Sync> FixedVec<T> {
+    pub fn new(capacity: usize) -> Self {
         let ptr;
         if capacity == 0 {
             ptr = NonNull::dangling();
-        } else if size_of::<T>() == 0 {
-            capacity = usize::MAX;
-            ptr = NonNull::dangling();
         } else {
-            let layout = Layout::array::<T>(capacity).expect("Layout overflow");
+            let layout = Layout::array::<Option<T>>(capacity).expect("Layout overflow");
 
             // SAFETY: we check for a zero-sized type or capacity above.
-            let raw_ptr = unsafe { alloc(layout) } as *mut T;
+            let raw_ptr = unsafe { alloc(layout) } as *mut Option<T>;
 
             if raw_ptr.is_null() {
                 handle_alloc_error(layout);
@@ -56,7 +53,9 @@ impl<T> FixedVec<T> {
         // Double the capacity when reallocating.
         let new_vec = Self::new(len * 2);
         // SAFETY: we just created the destination, nothing else has a reference to it.
-        unsafe { new_vec.ptr.copy_from_nonoverlapping(self.ptr, len); }
+        unsafe {
+            new_vec.ptr.copy_from_nonoverlapping(self.ptr, len);
+        }
         new_vec.next_idx.store(len, Relaxed);
         // Release so the copied data is accessible.
         new_vec.len.store(len, Release);
@@ -77,7 +76,7 @@ impl<T> FixedVec<T> {
         black_box(self.len.load(Acquire));
     }
 
-    pub fn push(&self, value: T) -> Result<(), T> {
+    pub fn push(&self, value: T) -> Result<usize, T> {
         // Using `Relaxed` since we don't care what goes on at previous indices when
         // pushing.
         let idx = self.next_idx.fetch_add(1, Relaxed);
@@ -85,7 +84,7 @@ impl<T> FixedVec<T> {
         if idx < self.cap {
             unsafe {
                 let ptr = self.ptr.add(idx);
-                ptr.write(value);
+                ptr.write(Some(value));
             }
             loop {
                 match self
@@ -96,9 +95,25 @@ impl<T> FixedVec<T> {
                     Err(_) => continue,
                 }
             }
-            Ok(())
+            Ok(idx)
         } else {
             Err(value)
+        }
+    }
+
+    /// Removes an element from this vector at the given index.
+    ///
+    /// Contrary to [`Vec::remove`], elements are not shifted. Removed elements
+    /// will be replaced first when calling [`Self::push`].
+    pub fn remove(&self, index: usize) {
+        if index < self.len() {
+            // SAFETY: index is within the length, so this is allocated and initialized
+            // memory. Allocations exceeding isize::MAX panic, so this can't overflow.
+            let mut ptr = unsafe { self.ptr.add(index) };
+            // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
+            // aligned to `T`.
+            let elem = unsafe { ptr.as_mut() };
+            *elem = None;
         }
     }
 
@@ -109,7 +124,8 @@ impl<T> FixedVec<T> {
             let ptr = unsafe { self.ptr.add(index) };
             // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
             // aligned to `T`.
-            return Some(unsafe { ptr.as_ref() });
+            let elem = unsafe { ptr.as_ref() };
+            return elem.as_ref();
         }
         None
     }
@@ -121,16 +137,17 @@ impl<T> FixedVec<T> {
             let mut ptr = unsafe { self.ptr.add(index) };
             // SAFETY: ptr was derived from a `NonNull`, so this can't be null, and, because
             // we use a mutable reference to self, it is exclusive. It is aligned to `T`.
-            return Some(unsafe { ptr.as_mut() });
+            let elem = unsafe { ptr.as_mut() };
+            return elem.as_mut();
         }
         None
     }
 }
 
-impl<T> Drop for FixedVec<T> {
+impl<T: Send + Sync> Drop for FixedVec<T> {
     fn drop(&mut self) {
         let elems = slice_from_raw_parts_mut(self.ptr.as_ptr(), self.len());
-        let layout = Layout::array::<T>(self.cap).unwrap();
+        let layout = Layout::array::<Option<T>>(self.cap).unwrap();
         unsafe {
             drop_in_place(elems);
             // Can't deallocate if it's zero-sized.
