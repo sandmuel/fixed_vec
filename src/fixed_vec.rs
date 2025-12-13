@@ -48,18 +48,18 @@ impl<T: Send + Sync> FixedVec<T> {
         }
     }
 
-    pub fn realloc(self) -> Self {
+    pub fn realloc(&mut self) {
         let len = self.len();
-        // Double the capacity when reallocating.
         let new_vec = Self::new(len * 2);
-        // SAFETY: we just created the destination, nothing else has a reference to it.
+
         unsafe {
             new_vec.ptr.copy_from_nonoverlapping(self.ptr, len);
         }
+
         new_vec.next_idx.store(len, Relaxed);
-        // Release so the copied data is accessible.
         new_vec.len.store(len, Release);
-        new_vec
+
+        *self = new_vec;
     }
 
     pub fn len(&self) -> usize {
@@ -113,6 +113,7 @@ impl<T: Send + Sync> FixedVec<T> {
             // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
             // aligned to `T`.
             let elem = unsafe { ptr.as_mut() };
+            // TODO: make this safe. Make it atomic.
             *elem = None;
         }
     }
