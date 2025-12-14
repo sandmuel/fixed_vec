@@ -4,6 +4,9 @@ use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
+mod iter;
+pub use iter::IntoIter;
+
 /// A thread safe [`Vec`]-like structure that never implicitly reallocates.
 ///
 /// Because it uses atomics and does not reallocate, [`FixedVec::push`] does not

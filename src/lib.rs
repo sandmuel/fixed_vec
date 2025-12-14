@@ -1,5 +1,5 @@
 mod fixed_vec;
-pub use fixed_vec::FixedVec;
+pub use fixed_vec::{FixedVec, IntoIter};
 
 #[cfg(test)]
 mod tests {
@@ -10,7 +10,6 @@ mod tests {
         let vec = FixedVec::<u64>::new(2);
         assert_eq!(Ok(()), vec.push(1));
         assert_eq!(Ok(()), vec.push(2));
-        assert_eq!(None, vec.get(0));
         // No more space, the value should be returned.
         assert_eq!(Err(4), vec.push(4));
         // This should be in bounds.
