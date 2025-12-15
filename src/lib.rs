@@ -16,5 +16,8 @@ mod tests {
         assert_eq!(Some(&2u64), vec.get(1));
         // This should be out of bounds.
         assert_eq!(None, vec.get(2));
+        for item in vec.into_iter() {
+            println!("{}", item);
+        }
     }
 }

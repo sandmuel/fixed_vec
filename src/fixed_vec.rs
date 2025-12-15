@@ -1,5 +1,4 @@
 use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
-use std::hint::black_box;
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
@@ -65,18 +64,21 @@ impl<T: Send + Sync> FixedVec<T> {
         *self = new_vec;
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         // Acquire to ensure writes up to this length have actually completed.
         self.len.load(Acquire)
     }
 
+    #[inline]
     pub fn capacity(&self) -> usize {
         self.cap
     }
 
+    #[inline]
     pub fn acquire(&self) {
         // Acquire to ensure writes up to this length have actually completed.
-        black_box(self.len.load(Acquire));
+        self.len.load(Acquire);
     }
 
     pub fn push(&self, value: T) -> Result<(), T> {
