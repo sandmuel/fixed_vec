@@ -1,8 +1,8 @@
-use std::iter::FusedIterator;
 use crate::FixedVec;
+use crate::fixed_vec::dealloc_vec;
+use std::iter::FusedIterator;
 use std::mem::ManuallyDrop;
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
-use crate::fixed_vec::dealloc_vec;
 
 impl<T> IntoIterator for FixedVec<T> {
     type Item = T;
@@ -81,5 +81,8 @@ impl<T> Drop for IntoIter<T> {
                 drop_in_place(elems);
             }
         }
+
+        // Deallocation occurs in DropGuard. This is called even if dropping
+        // elements panics.
     }
 }
