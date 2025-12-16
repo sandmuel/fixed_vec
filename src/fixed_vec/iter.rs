@@ -28,6 +28,13 @@ pub struct IntoIter<T> {
     cap: usize,
 }
 
+// SAFETY: `T` is owned by `IntoIter` and provides no interior mutability of its
+// own, so as long as `T` is Send, `IntoIter` is too.
+unsafe impl<T: Send> Send for IntoIter<T> {}
+
+// SAFETY: `IntoIter` has no public fields or methods which take `&self`.
+unsafe impl<T> Sync for IntoIter<T> {}
+
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
 

@@ -22,6 +22,7 @@ pub struct FixedVec<T> {
 
 // SAFETY: operations on the same value are atomic.
 unsafe impl<T: Send> Send for FixedVec<T> {}
+
 // SAFETY: addresses are all based on the atomic length and unmodified pointer.
 // They cannot overlap.
 unsafe impl<T: Sync> Sync for FixedVec<T> {}
