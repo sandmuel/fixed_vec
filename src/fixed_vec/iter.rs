@@ -1,3 +1,4 @@
+use std::iter::FusedIterator;
 use crate::FixedVec;
 use std::mem::ManuallyDrop;
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
@@ -42,9 +43,15 @@ impl<T> Iterator for IntoIter<T> {
             Some(item_ptr.read())
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len - self.idx, Some(self.len - self.idx))
+    }
 }
 
 impl<T> ExactSizeIterator for IntoIter<T> {}
+
+impl<T> FusedIterator for IntoIter<T> {}
 
 impl<T> DoubleEndedIterator for IntoIter<T> {
     fn next_back(&mut self) -> Option<Self::Item> {
