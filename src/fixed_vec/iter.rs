@@ -52,7 +52,7 @@ impl<T> Iterator for IntoIter<T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.end - self.start, Some(self.end - self.start))
+        (self.end - self.start + 1, Some(self.end - self.start + 1))
     }
 }
 
