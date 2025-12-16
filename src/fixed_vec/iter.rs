@@ -3,7 +3,7 @@ use std::alloc::{Layout, dealloc};
 use std::mem::ManuallyDrop;
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
 
-impl<T: Send + Sync> IntoIterator for FixedVec<T> {
+impl<T> IntoIterator for FixedVec<T> {
     type Item = T;
     type IntoIter = IntoIter<T>;
 
@@ -20,14 +20,14 @@ impl<T: Send + Sync> IntoIterator for FixedVec<T> {
     }
 }
 
-pub struct IntoIter<T: Send + Sync> {
+pub struct IntoIter<T> {
     ptr: NonNull<T>,
     len: usize,
     idx: usize,
     cap: usize,
 }
 
-impl<T: Send + Sync> Iterator for IntoIter<T> {
+impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -44,7 +44,7 @@ impl<T: Send + Sync> Iterator for IntoIter<T> {
     }
 }
 
-impl<T: Send + Sync> Drop for IntoIter<T> {
+impl<T> Drop for IntoIter<T> {
     fn drop(&mut self) {
         // Drop any remaining initialized elements that haven't been yielded.
         if self.idx < self.len {
@@ -61,6 +61,7 @@ impl<T: Send + Sync> Drop for IntoIter<T> {
         let layout = Layout::array::<T>(self.cap).expect("Layout overflow");
         if layout.size() > 0 {
             unsafe {
+                // SAFETY: we use the same layout as was used to allocate.
                 dealloc(self.ptr.as_ptr() as *mut u8, layout);
             }
         }

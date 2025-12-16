@@ -4,13 +4,16 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 mod iter;
+mod iter_ref;
+mod iter_mut;
+
 pub use iter::IntoIter;
 
 /// A thread safe [`Vec`]-like structure that never implicitly reallocates.
 ///
 /// Because it uses atomics and does not reallocate, [`FixedVec::push`] does not
 /// require locks or a mutable reference to self.
-pub struct FixedVec<T: Send + Sync> {
+pub struct FixedVec<T> {
     ptr: NonNull<T>,
     next_idx: AtomicUsize,
     len: AtomicUsize,
@@ -18,12 +21,12 @@ pub struct FixedVec<T: Send + Sync> {
 }
 
 // SAFETY: operations on the same value are atomic.
-unsafe impl<T: Send + Sync> Send for FixedVec<T> {}
+unsafe impl<T: Send> Send for FixedVec<T> {}
 // SAFETY: addresses are all based on the atomic length and unmodified pointer.
 // They cannot overlap.
-unsafe impl<T: Send + Sync> Sync for FixedVec<T> {}
+unsafe impl<T: Sync> Sync for FixedVec<T> {}
 
-impl<T: Send + Sync> FixedVec<T> {
+impl<T> FixedVec<T> {
     pub fn new(capacity: usize) -> Self {
         let ptr;
         if capacity == 0 {
@@ -133,16 +136,29 @@ impl<T: Send + Sync> FixedVec<T> {
     }
 }
 
-impl<T: Send + Sync> Drop for FixedVec<T> {
+impl<T> Drop for FixedVec<T> {
     fn drop(&mut self) {
-        let elems = slice_from_raw_parts_mut(self.ptr.as_ptr(), self.len());
-        let layout = Layout::array::<T>(self.cap).unwrap();
-        unsafe {
-            drop_in_place(elems);
-            // Can't deallocate if it's zero-sized.
-            if layout.size() > 0 {
-                dealloc(self.ptr.as_ptr() as *mut u8, layout);
+        struct DropGuard<'a, T>(&'a mut FixedVec<T>);
+
+        impl<T> Drop for DropGuard<'_, T> {
+            fn drop(&mut self) {
+                let layout = Layout::array::<T>(self.0.cap).unwrap();
+                unsafe {
+                    // Can't deallocate if it's zero-sized.
+                    if layout.size() > 0 {
+                        // SAFETY: the same layout was used to allocate.
+                        dealloc(self.0.ptr.as_ptr() as *mut u8, layout);
+                    }
+                }
             }
         }
+
+        let _ = DropGuard(self);
+
+        // Drop elements.
+        let elems = slice_from_raw_parts_mut(self.ptr.as_ptr(), self.len());
+        unsafe { drop_in_place(elems); }
+
+        // Deallocation occurs in DropGuard. This is called even if dropping elements panics.
     }
 }
