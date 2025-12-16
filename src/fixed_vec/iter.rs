@@ -11,8 +11,8 @@ impl<T> IntoIterator for FixedVec<T> {
     fn into_iter(self) -> Self::IntoIter {
         let iter = Self::IntoIter {
             ptr: self.ptr,
-            len: self.len(),
-            idx: 0,
+            start: 0,
+            end: self.len() - 1,
             cap: self.capacity(),
         };
 
@@ -23,8 +23,8 @@ impl<T> IntoIterator for FixedVec<T> {
 
 pub struct IntoIter<T> {
     ptr: NonNull<T>,
-    len: usize,
-    idx: usize,
+    start: usize,
+    end: usize,
     cap: usize,
 }
 
@@ -32,20 +32,20 @@ impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.idx >= self.len {
+        if self.start >= self.end {
             return None;
         }
 
         unsafe {
             // SAFETY: we return if the index is out of bounds.
-            let item_ptr = self.ptr.add(self.idx);
-            self.idx += 1;
+            let item_ptr = self.ptr.add(self.start);
+            self.start += 1;
             Some(item_ptr.read())
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len - self.idx, Some(self.len - self.idx))
+        (self.end - self.start, Some(self.end - self.start))
     }
 }
 
@@ -55,7 +55,16 @@ impl<T> FusedIterator for IntoIter<T> {}
 
 impl<T> DoubleEndedIterator for IntoIter<T> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        todo!()
+        if self.end <= self.start {
+            return None;
+        }
+
+        unsafe {
+            // SAFETY: we return if the index is out of bounds.
+            let item_ptr = self.ptr.add(self.end);
+            self.end -= 1;
+            Some(item_ptr.read())
+        }
     }
 }
 
@@ -72,10 +81,10 @@ impl<T> Drop for IntoIter<T> {
         let _ = DropGuard(self);
 
         // Drop any remaining initialized elements that haven't been yielded.
-        if self.idx < self.len {
-            let remaining = self.len - self.idx;
+        if self.start <= self.end {
+            let remaining = self.end - self.start + 1;
             unsafe {
-                let start_ptr = self.ptr.as_ptr().add(self.idx);
+                let start_ptr = self.ptr.as_ptr().add(self.start);
                 // SAFETY: elements in [idx, len) are initialized; we only drop them once here.
                 let elems = slice_from_raw_parts_mut(start_ptr, remaining);
                 drop_in_place(elems);
