@@ -141,14 +141,7 @@ impl<T> Drop for FixedVec<T> {
 
         impl<T> Drop for DropGuard<'_, T> {
             fn drop(&mut self) {
-                let layout = Layout::array::<T>(self.0.cap).unwrap();
-                unsafe {
-                    // Can't deallocate if it's zero-sized.
-                    if layout.size() > 0 {
-                        // SAFETY: the same layout was used to allocate.
-                        dealloc(self.0.ptr.as_ptr() as *mut u8, layout);
-                    }
-                }
+                dealloc_vec(self.0.ptr, self.0.cap);
             }
         }
 
@@ -162,5 +155,18 @@ impl<T> Drop for FixedVec<T> {
 
         // Deallocation occurs in DropGuard. This is called even if dropping
         // elements panics.
+    }
+}
+
+fn dealloc_vec<T>(ptr: NonNull<T>, capacity: usize) {
+    // This should not return an error since this is the same layout as was used for
+    // allocation.
+    let layout = Layout::array::<T>(capacity).unwrap();
+    unsafe {
+        // We can't deallocate if it's zero-sized.
+        if layout.size() > 0 {
+            // SAFETY: the same layout was used to allocate.
+            dealloc(ptr.as_ptr() as *mut u8, layout);
+        }
     }
 }

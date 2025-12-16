@@ -1,7 +1,7 @@
 use crate::FixedVec;
-use std::alloc::{Layout, dealloc};
 use std::mem::ManuallyDrop;
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
+use crate::fixed_vec::dealloc_vec;
 
 impl<T> IntoIterator for FixedVec<T> {
     type Item = T;
@@ -54,6 +54,16 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 
 impl<T> Drop for IntoIter<T> {
     fn drop(&mut self) {
+        struct DropGuard<'a, T>(&'a mut IntoIter<T>);
+
+        impl<T> Drop for DropGuard<'_, T> {
+            fn drop(&mut self) {
+                dealloc_vec(self.0.ptr, self.0.cap);
+            }
+        }
+
+        let _ = DropGuard(self);
+
         // Drop any remaining initialized elements that haven't been yielded.
         if self.idx < self.len {
             let remaining = self.len - self.idx;
@@ -62,15 +72,6 @@ impl<T> Drop for IntoIter<T> {
                 // SAFETY: elements in [idx, len) are initialized; we only drop them once here.
                 let elems = slice_from_raw_parts_mut(start_ptr, remaining);
                 drop_in_place(elems);
-            }
-        }
-
-        // Deallocate the original allocation.
-        let layout = Layout::array::<T>(self.cap).expect("Layout overflow");
-        if layout.size() > 0 {
-            unsafe {
-                // SAFETY: we use the same layout as was used to allocate.
-                dealloc(self.ptr.as_ptr() as *mut u8, layout);
             }
         }
     }
