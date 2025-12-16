@@ -4,8 +4,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 mod iter;
-mod iter_ref;
 mod iter_mut;
+mod iter_ref;
 
 pub use iter::IntoIter;
 
@@ -78,8 +78,7 @@ impl<T> FixedVec<T> {
         self.cap
     }
 
-    #[inline]
-    pub fn acquire(&self) {
+    fn acquire(&self) {
         // Acquire to ensure writes up to this length have actually completed.
         self.len.load(Acquire);
     }
@@ -157,8 +156,11 @@ impl<T> Drop for FixedVec<T> {
 
         // Drop elements.
         let elems = slice_from_raw_parts_mut(self.ptr.as_ptr(), self.len());
-        unsafe { drop_in_place(elems); }
+        unsafe {
+            drop_in_place(elems);
+        }
 
-        // Deallocation occurs in DropGuard. This is called even if dropping elements panics.
+        // Deallocation occurs in DropGuard. This is called even if dropping
+        // elements panics.
     }
 }

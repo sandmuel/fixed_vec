@@ -44,6 +44,14 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
+impl<T> ExactSizeIterator for IntoIter<T> {}
+
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        todo!()
+    }
+}
+
 impl<T> Drop for IntoIter<T> {
     fn drop(&mut self) {
         // Drop any remaining initialized elements that haven't been yielded.
