@@ -136,15 +136,18 @@ impl<T> FixedVec<T> {
     }
 }
 
-impl<T> Clone for FixedVec<T> {
+impl<T: Clone> Clone for FixedVec<T> {
     fn clone(&self) -> Self {
         let len = self.len();
-        Self {
-            ptr: self.ptr, // TODO: copy the memory.
-            next_idx: AtomicUsize::new(len),
-            len: AtomicUsize::new(len),
-            cap: self.cap,
+        let new_vec = Self::new(self.cap);
+
+        for i in 0..len {
+            if let Some(item) = self.get(i) {
+                let _ = new_vec.push(item.clone());
+            }
         }
+
+        new_vec
     }
 }
 
