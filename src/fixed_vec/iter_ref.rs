@@ -5,6 +5,6 @@ impl<'a, T: Send + Sync> IntoIterator for &'a FixedVec<T> {
     type IntoIter = IntoIter<&'a T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        todo!()
+        unimplemented!()
     }
 }

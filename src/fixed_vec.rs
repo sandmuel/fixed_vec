@@ -136,6 +136,18 @@ impl<T> FixedVec<T> {
     }
 }
 
+impl<T> Clone for FixedVec<T> {
+    fn clone(&self) -> Self {
+        let len = self.len();
+        Self {
+            ptr: self.ptr, // TODO: copy the memory.
+            next_idx: AtomicUsize::new(len),
+            len: AtomicUsize::new(len),
+            cap: self.cap,
+        }
+    }
+}
+
 impl<T> Drop for FixedVec<T> {
     fn drop(&mut self) {
         struct DropGuard<'a, T>(&'a mut FixedVec<T>);

@@ -12,7 +12,7 @@ impl<T> IntoIterator for FixedVec<T> {
         let iter = Self::IntoIter {
             ptr: self.ptr,
             start: 0,
-            end: self.len() - 1,
+            end: self.len(),
             cap: self.capacity(),
         };
 
@@ -39,7 +39,7 @@ impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.start >= self.end {
+        if self.start == self.end {
             return None;
         }
 
@@ -52,7 +52,7 @@ impl<T> Iterator for IntoIter<T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.end - self.start + 1, Some(self.end - self.start + 1))
+        (self.end - self.start, Some(self.end - self.start))
     }
 }
 
@@ -62,13 +62,13 @@ impl<T> FusedIterator for IntoIter<T> {}
 
 impl<T> DoubleEndedIterator for IntoIter<T> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        if self.end <= self.start {
+        if self.end == self.start {
             return None;
         }
 
         unsafe {
             // SAFETY: we return if the index is out of bounds.
-            let item_ptr = self.ptr.add(self.end);
+            let item_ptr = self.ptr.add(self.end - 1);
             self.end -= 1;
             Some(item_ptr.read())
         }
@@ -89,7 +89,7 @@ impl<T> Drop for IntoIter<T> {
 
         // Drop any remaining initialized elements that haven't been yielded.
         if self.start <= self.end {
-            let remaining = self.end - self.start + 1;
+            let remaining = self.end - self.start;
             unsafe {
                 let start_ptr = self.ptr.as_ptr().add(self.start);
                 // SAFETY: elements in [idx, len) are initialized; we only drop them once here.
