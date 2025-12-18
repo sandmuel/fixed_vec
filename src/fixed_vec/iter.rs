@@ -54,6 +54,17 @@ impl<T> Iterator for IntoIter<T> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.end - self.start, Some(self.end - self.start))
     }
+
+    // Manually implemented because we can do it faster since we know the length.
+    fn count(self) -> usize {
+        self.end - self.start
+    }
+
+    // Since we also implement DoubleEndedIterator, we use next_back for better
+    // performance than the default implementation.
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
 }
 
 impl<T> ExactSizeIterator for IntoIter<T> {}
