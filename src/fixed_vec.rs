@@ -122,6 +122,20 @@ impl<T> FixedVec<T> {
         None
     }
 
+    /// Returns a reference to an element without bounds checking.
+    ///
+    /// # Safety
+    ///
+    /// The index must be within the length of this [FixedVec].
+    pub unsafe fn get_unchecked(&self, index: usize) -> &T {
+        self.acquire();
+        // SAFETY: if the caller gives us a valid index, this is a valid pointer.
+        let ptr = unsafe { self.ptr.add(index) };
+        // SAFETY: as long as the index is within the length, this is a valid `T`.
+        let elem = unsafe { ptr.as_ref() };
+        elem
+    }
+
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         if index < self.len() {
             // SAFETY: index is within the length, so this is allocated and initialized
