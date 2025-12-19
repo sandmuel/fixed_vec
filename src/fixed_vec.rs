@@ -54,7 +54,8 @@ impl<T> FixedVec<T> {
 
     pub fn realloc(&mut self) {
         let len = self.len();
-        let new_vec = Self::new(len * 2);
+        let new_cap = if self.cap == 0 { 1 } else { self.cap * 2 };
+        let new_vec = Self::new(new_cap);
 
         unsafe {
             new_vec.ptr.copy_from_nonoverlapping(self.ptr, len);
