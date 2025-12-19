@@ -29,11 +29,10 @@ unsafe impl<T: Sync> Sync for FixedVec<T> {}
 impl<T> FixedVec<T> {
     pub fn new(capacity: usize) -> Self {
         let ptr;
-        if capacity == 0 {
+        let layout = Layout::array::<T>(capacity).expect("Layout overflow");
+        if layout.size() == 0 {
             ptr = NonNull::dangling();
         } else {
-            let layout = Layout::array::<T>(capacity).expect("Layout overflow");
-
             // SAFETY: we check for a zero-sized type or capacity above.
             let raw_ptr = unsafe { alloc(layout) } as *mut T;
 
