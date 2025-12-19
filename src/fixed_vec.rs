@@ -133,6 +133,12 @@ impl<T> DerefMut for FixedVec<T> {
     }
 }
 
+impl<T: Debug> Debug for FixedVec<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Debug::fmt(&**self, f)
+    }
+}
+
 impl<T: Clone> Clone for FixedVec<T> {
     fn clone(&self) -> Self {
         let len = self.len();
