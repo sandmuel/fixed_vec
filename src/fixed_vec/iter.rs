@@ -107,25 +107,29 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 
 impl<T> Drop for IntoIter<T> {
     fn drop(&mut self) {
-        struct DropGuard<'a, T>(&'a mut IntoIter<T>);
+        struct DropGuard<T> {
+            ptr: NonNull<T>,
+            cap: usize,
+        }
 
-        impl<T> Drop for DropGuard<'_, T> {
+        impl<T> Drop for DropGuard<T> {
             fn drop(&mut self) {
-                dealloc_vec(self.0.ptr, self.0.cap);
+                dealloc_vec(self.ptr, self.cap);
             }
         }
 
-        let _ = DropGuard(self);
+        let _guard = DropGuard {
+            ptr: self.ptr,
+            cap: self.cap,
+        };
 
         // Drop any remaining initialized elements that haven't been yielded.
-        if self.start <= self.end {
-            let remaining = self.end - self.start;
-            unsafe {
-                let start_ptr = self.ptr.as_ptr().add(self.start);
-                // SAFETY: elements in [idx, len) are initialized; we only drop them once here.
-                let elems = slice_from_raw_parts_mut(start_ptr, remaining);
-                drop_in_place(elems);
-            }
+        let remaining = self.end - self.start;
+        unsafe {
+            let start_ptr = self.ptr.as_ptr().add(self.start);
+            // SAFETY: elements in [idx, len) are initialized; we only drop them once here.
+            let elems = slice_from_raw_parts_mut(start_ptr, remaining);
+            drop_in_place(elems);
         }
 
         // Deallocation occurs in DropGuard. This is called even if dropping
