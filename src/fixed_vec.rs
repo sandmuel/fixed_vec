@@ -150,15 +150,21 @@ impl<T: Clone> Clone for FixedVec<T> {
 
 impl<T> Drop for FixedVec<T> {
     fn drop(&mut self) {
-        struct DropGuard<'a, T>(&'a mut FixedVec<T>);
+        struct DropGuard<T> {
+            ptr: NonNull<T>,
+            cap: usize,
+        }
 
-        impl<T> Drop for DropGuard<'_, T> {
+        impl<T> Drop for DropGuard<T> {
             fn drop(&mut self) {
-                dealloc_vec(self.0.ptr, self.0.cap);
+                dealloc_vec(self.ptr, self.cap);
             }
         }
 
-        let _ = DropGuard(self);
+        let _guard = DropGuard {
+            ptr: self.ptr,
+            cap: self.cap,
+        };
 
         // Drop elements.
         let elems = slice_from_raw_parts_mut(self.ptr.as_ptr(), self.len());
