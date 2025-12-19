@@ -1,5 +1,7 @@
 use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
+use std::ops::{Deref, DerefMut};
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
+use std::slice;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
@@ -109,44 +111,28 @@ impl<T> FixedVec<T> {
         }
     }
 
-    pub fn get(&self, index: usize) -> Option<&T> {
-        if index < self.len() {
-            // SAFETY: index is within the length, so this is allocated and initialized
-            // memory. Allocations exceeding isize::MAX panic, so this can't overflow.
-            let ptr = unsafe { self.ptr.add(index) };
-            // SAFETY: ptr was derived from a `NonNull`, so this can't be null. It is
-            // aligned to `T`.
-            let elem = unsafe { ptr.as_ref() };
-            return Some(elem);
-        }
-        None
+    pub fn as_slice(&self) -> &[T] {
+        // SAFETY: all elements up to `len` have been initialized and are of the type `T`.
+        unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.len()) }
     }
 
-    /// Returns a reference to an element without bounds checking.
-    ///
-    /// # Safety
-    ///
-    /// The index must be within the length of this [FixedVec].
-    pub unsafe fn get_unchecked(&self, index: usize) -> &T {
-        self.acquire();
-        // SAFETY: if the caller gives us a valid index, this is a valid pointer.
-        let ptr = unsafe { self.ptr.add(index) };
-        // SAFETY: as long as the index is within the length, this is a valid `T`.
-        let elem = unsafe { ptr.as_ref() };
-        elem
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        // SAFETY: all elements up to `len` have been initialized and are of the type `T`.
+        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len()) }
     }
+}
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
-        if index < self.len() {
-            // SAFETY: index is within the length, so this is allocated and initialized
-            // memory.
-            let mut ptr = unsafe { self.ptr.add(index) };
-            // SAFETY: ptr was derived from a `NonNull`, so this can't be null, and, because
-            // we use a mutable reference to self, it is exclusive. It is aligned to `T`.
-            let elem = unsafe { ptr.as_mut() };
-            return Some(elem);
-        }
-        None
+impl<T> Deref for FixedVec<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<T> DerefMut for FixedVec<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
     }
 }
 
