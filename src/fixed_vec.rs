@@ -1,4 +1,5 @@
 use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
+use std::fmt::{self, Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
 use std::slice;
@@ -133,9 +134,43 @@ impl<T> DerefMut for FixedVec<T> {
     }
 }
 
+impl<T> Default for FixedVec<T> {
+    fn default() -> Self {
+        // The default capacity is 1 since a capacity of 0 would be pretty useless.
+        Self::new(1)
+    }
+}
+
 impl<T: Debug> Debug for FixedVec<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Debug::fmt(&**self, f)
+    }
+}
+
+impl<T> FromIterator<T> for FixedVec<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let (lower, upper) = iter.size_hint();
+        let cap = upper.unwrap_or(lower);
+        let mut vec = Self::new(cap);
+        for item in iter {
+            if let Err(item) = vec.push(item) {
+                vec.realloc();
+                let _ = vec.push(item);
+            }
+        }
+        vec
+    }
+}
+
+impl<T> Extend<T> for FixedVec<T> {
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        for item in iter {
+            if let Err(item) = self.push(item) {
+                self.realloc();
+                let _ = self.push(item);
+            }
+        }
     }
 }
 
