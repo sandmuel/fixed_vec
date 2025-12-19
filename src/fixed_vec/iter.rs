@@ -3,6 +3,25 @@ use crate::fixed_vec::dealloc_vec;
 use std::iter::FusedIterator;
 use std::mem::ManuallyDrop;
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
+use std::slice;
+
+impl<'a, T> IntoIterator for &'a FixedVec<T> {
+    type Item = &'a T;
+    type IntoIter = slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut FixedVec<T> {
+    type Item = &'a mut T;
+    type IntoIter = slice::IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
 
 impl<T> IntoIterator for FixedVec<T> {
     type Item = T;

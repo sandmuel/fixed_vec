@@ -6,9 +6,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release};
 
 mod iter;
-mod iter_mut;
-mod iter_ref;
-
 pub use iter::IntoIter;
 
 /// A thread safe [`Vec`]-like structure that never implicitly reallocates.
