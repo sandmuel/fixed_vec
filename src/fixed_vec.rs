@@ -109,12 +109,12 @@ impl<T> FixedVec<T> {
     }
 
     pub fn as_slice(&self) -> &[T] {
-        // SAFETY: all elements up to `len` have been initialized and are of the type `T`.
+        // SAFETY: all elements up to `len` have been initialized and are of type `T`.
         unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.len()) }
     }
 
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        // SAFETY: all elements up to `len` have been initialized and are of the type `T`.
+        // SAFETY: all elements up to `len` have been initialized and are of type `T`.
         unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len()) }
     }
 }
