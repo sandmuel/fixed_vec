@@ -71,7 +71,8 @@ impl<T> FixedVec<T> {
         // We move new_vec into self and get the old self, so we can drop the old one.
         let old_vec = std::mem::replace(self, new_vec);
         old_vec.len.store(0, Relaxed);
-        // old_vec will be dropped at the end of this scope, deallocating its memory.
+        // old_vec will be dropped at the end of this scope, deallocating its
+        // memory.
     }
 
     #[inline]
@@ -96,14 +97,12 @@ impl<T> FixedVec<T> {
                 let ptr = self.ptr.add(idx);
                 ptr.write(value);
             }
-            loop {
-                match self
-                    .len
-                    .compare_exchange_weak(idx, idx + 1, Release, Relaxed)
-                {
-                    Ok(_) => break,
-                    Err(_) => continue,
-                }
+            while self
+                .len
+                .compare_exchange_weak(idx, idx + 1, Release, Relaxed)
+                .is_err()
+            {
+                std::hint::spin_loop();
             }
             Ok(())
         } else {
