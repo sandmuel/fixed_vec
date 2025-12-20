@@ -28,6 +28,7 @@ unsafe impl<T: Send> Send for FixedVec<T> {}
 unsafe impl<T: Sync> Sync for FixedVec<T> {}
 
 impl<T> FixedVec<T> {
+    #[inline]
     pub fn new(capacity: usize) -> Self {
         let ptr;
         let layout = Layout::array::<T>(capacity).expect("Layout overflow");
@@ -53,6 +54,7 @@ impl<T> FixedVec<T> {
         }
     }
 
+    #[inline]
     pub fn realloc(&mut self) {
         let len = self.len();
         let new_cap = if self.cap == 0 { 1 } else { self.cap * 2 };
@@ -79,11 +81,7 @@ impl<T> FixedVec<T> {
         self.cap
     }
 
-    fn acquire(&self) {
-        // Acquire to ensure writes up to this length have actually completed.
-        self.len.load(Acquire);
-    }
-
+    #[inline]
     pub fn push(&self, value: T) -> Result<(), T> {
         // Using `Relaxed` since we don't care what goes on at previous indices when
         // pushing.
@@ -109,11 +107,13 @@ impl<T> FixedVec<T> {
         }
     }
 
+    #[inline]
     pub fn as_slice(&self) -> &[T] {
         // SAFETY: all elements up to `len` have been initialized and are of type `T`.
         unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.len()) }
     }
 
+    #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         // SAFETY: all elements up to `len` have been initialized and are of type `T`.
         unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len()) }
@@ -123,12 +123,14 @@ impl<T> FixedVec<T> {
 impl<T> Deref for FixedVec<T> {
     type Target = [T];
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_slice()
     }
 }
 
 impl<T> DerefMut for FixedVec<T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_mut_slice()
     }
@@ -148,6 +150,7 @@ impl<T: Debug> Debug for FixedVec<T> {
 }
 
 impl<T> FromIterator<T> for FixedVec<T> {
+    #[inline]
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (lower, upper) = iter.size_hint();
@@ -164,6 +167,7 @@ impl<T> FromIterator<T> for FixedVec<T> {
 }
 
 impl<T> Extend<T> for FixedVec<T> {
+    #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         for item in iter {
             if let Err(item) = self.push(item) {
