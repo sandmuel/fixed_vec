@@ -1,5 +1,6 @@
 use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
 use std::fmt::{self, Debug, Formatter};
+use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
 use std::ptr::{NonNull, drop_in_place, slice_from_raw_parts_mut};
 use std::slice;
