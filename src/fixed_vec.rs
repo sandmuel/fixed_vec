@@ -68,7 +68,10 @@ impl<T> FixedVec<T> {
         new_vec.next_idx.store(len, Relaxed);
         new_vec.len.store(len, Release);
 
-        *self = new_vec;
+        // We move new_vec into self and get the old self, so we can drop the old one.
+        let old_vec = std::mem::replace(self, new_vec);
+        old_vec.len.store(0, Relaxed);
+        // old_vec will be dropped at the end of this scope, deallocating its memory.
     }
 
     #[inline]
