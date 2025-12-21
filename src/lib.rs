@@ -8,8 +8,8 @@ mod tests {
     #[test]
     fn single_thread() {
         let vec = FixedVec::<u64>::new(2);
-        assert_eq!(Ok(()), vec.push(1));
-        assert_eq!(Ok(()), vec.push(2));
+        assert_eq!(Ok(0), vec.push(1));
+        assert_eq!(Ok(1), vec.push(2));
         // No more space, the value should be returned.
         assert_eq!(Err(4), vec.push(4));
         // This should be in bounds.

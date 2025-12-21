@@ -87,7 +87,7 @@ impl<T> FixedVec<T> {
     }
 
     #[inline]
-    pub fn push(&self, value: T) -> Result<(), T> {
+    pub fn push(&self, value: T) -> Result<usize, T> {
         // Using `Relaxed` since we don't care what goes on at previous indices when
         // pushing.
         let idx = self.next_idx.fetch_add(1, Relaxed);
@@ -104,7 +104,7 @@ impl<T> FixedVec<T> {
             {
                 std::hint::spin_loop();
             }
-            Ok(())
+            Ok(idx)
         } else {
             Err(value)
         }
